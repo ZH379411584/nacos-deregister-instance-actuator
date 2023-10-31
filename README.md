@@ -77,4 +77,68 @@ management:
 ```shell
 curl  http://localhost:{management.server.port}/actuator/nacos-deregister-instance
 ```
-#
+# 5. spring cloud 通用服务下线功能
+搜索spring cloud应该提供这种通用的服务下线功能，后来的确看到了
+org.springframework.cloud.client.serviceregistry.endpoint.ServiceRegistryEndpoint
+```java
+package org.springframework.cloud.client.serviceregistry.endpoint;
+import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
+import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
+import org.springframework.boot.actuate.endpoint.annotation.WriteOperation;
+import org.springframework.cloud.client.serviceregistry.Registration;
+import org.springframework.cloud.client.serviceregistry.ServiceRegistry;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.util.Assert;
+/**
+ * Endpoint to display and set the service instance status using the ServiceRegistry.
+ *
+ * @author Spencer Gibb
+ */
+@SuppressWarnings("unchecked")
+@Endpoint(id = "service-registry")
+public class ServiceRegistryEndpoint {
+
+    private final ServiceRegistry serviceRegistry;
+
+    private Registration registration;
+
+    public ServiceRegistryEndpoint(ServiceRegistry<?> serviceRegistry) {
+        this.serviceRegistry = serviceRegistry;
+    }
+
+    public void setRegistration(Registration registration) {
+        this.registration = registration;
+    }
+
+    @WriteOperation
+    public ResponseEntity<?> setStatus(String status) {
+        Assert.notNull(status, "status may not by null");
+
+        if (this.registration == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("no registration found");
+        }
+
+        this.serviceRegistry.setStatus(this.registration, status);
+        return ResponseEntity.ok().build();
+    }
+
+    @ReadOperation
+    public ResponseEntity getStatus() {
+        if (this.registration == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("no registration found");
+        }
+
+        return ResponseEntity.ok()
+                .body(this.serviceRegistry.getStatus(this.registration));
+    }
+}
+```
+
+调用
+
+```
+curl -i -H "Content-Type: application/json" -X POST -d '{"status":"DOWN"}' http://localhost:9090/actuator/service-registry
+```
